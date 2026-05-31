@@ -2,7 +2,7 @@ import re
 import subprocess
 from flask import Flask, jsonify, render_template
 
-# Initialize the official WaveScope application server
+# Initialize the official SpectraNet core application engine
 app = Flask(__name__)
 
 
@@ -25,15 +25,15 @@ def get_average_signal():
 
 @app.route("/")
 def index():
-    # Renders the WaveScope user interface
+    # Serves the main SpectraNet graphical interface
     return render_template("index.html")
 
 
 @app.route("/telemetry")
 def telemetry():
-    # API data stream consumed by the WaveScope frontend JavaScript engine
+    # Live API data stream consumed by the front-end rendering layer
     return jsonify({"ambient_power": get_average_signal()})
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8080, debug=True)# Spectranet
+    app.run(host="0.0.0.0", port=8080, debug=True)
