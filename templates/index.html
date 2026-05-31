@@ -1,1 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SpectraNet // RF Analysis Tool</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            background-color: #05080c;
+            color: #00ff66;
+            font-family: 'Courier New', monospace;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 {
+            text-shadow: 0 0 10px #00ff66;
+            letter-spacing: 3px;
+            text-align: center;
+            margin-bottom: 5px;
+        }
+        .container {
+            width: 90%;
+            max-width: 1000px;
+            background: #0b111e;
+            padding: 15px;
+            border-radius: 8px;
+            border: 2px solid #00ff66;
+            box-shadow: 0 0 25px rgba(0, 255, 102, 0.15);
+        }
+        #status-display {
+            font-size: 14px;
+            margin-bottom: 25px;
+            color: #8899a6;
+            letter-spacing: 1px;
+        }
+        .alert-text {
+            color: #ff3333;
+            text-shadow: 0 0 10px #ff3333;
+            font-weight: bold;
+            animation: pulse 0.5s infinite alternate;
+        }
+        @keyframes pulse {
+            from { opacity: 0.5; } to { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
 
+    <h1>SPECTRANET // RADAR OVERVIEW</h1>
+    <div id="status-display">SIGNAL CONDITION: <span id="condition-label" style="color:#00ff66;">SCANNER_NOMINAL</span></div>
+
+    <div class="container">
+        <canvas id="spectraNetCanvas"></canvas>
+    </div>
+
+    <script>
+        const ctx = document.getElementById('spectraNetCanvas').getContext('2d');
+        
+        // Setup 50 plotting points along the X-axis for horizontal animation flow
+        const maxDataPoints = 50;
+        const labels = Array.from({length: maxDataPoints}, () => "");
+        let waveData = Array.from({length: maxDataPoints}, () => 50); 
+        
+        let cycleCounter = 0;
+        let ambientPowerLevel = 100;
+
+        // Initialize line configuration simulating a real-time hardware radar sweeping beam
+        const scopeChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'SpectraNet Frequency Trace',
+                    data: waveData,
+                    borderColor: '#00ff66',
+                    borderWidth: 3,
+                    pointRadius: 0, // Hides coordinate dots for a seamless fluid wave
+                    tension: 0.6,   // Smooths line vectors into organic curves
+                    fill: false
+                }]
+            },
+            options: {
+                responsive: true,
+                animation: { duration: 100 }, // Snappy frame transition speed
+                scales: {
+                    y: { min: 0, max: 100, display: true, grid: { color: '#112233' }, ticks: { display: false } },
+                    x: { display: false }
+                },
+                plugins: { legend: { display: false } }
+            }
+        });
+
+        // Background fetch worker to poll data intervals from Flask API
+        async function fetchEnvironmentTelemetry() {
+            try {
+                const response = await fetch('/telemetry');
+                const data = await response.json();
+                ambientPowerLevel = data.ambient_power;
+            } catch (e) {
+                console.error("SpectraNet connection fault:", e);
+            }
+        }
+        setInterval(fetchEnvironmentTelemetry, 1000);
+
+        // Physics engine mapping loop running at rendering refresh rates
+        function drawWaveFrame() {
+            cycleCounter += 0.4;
+            waveData.shift(); // Remove the tail frame entry to roll the wave chart leftward
+
+            // Signal deviation threshold to isolate active external interference spikes
+            const isInterfered = ambientPowerLevel < 85; 
+            let nextPoint;
+
+            const labelEl = document.getElementById('condition-label');
+            if (isInterfered) {
+                // Modulate intense jagged fluctuations if noise threshold is breached
+                nextPoint = 50 + (Math.sin(cycleCounter * 4) * 45) + (Math.random() * 15 - 7.5);
+                labelEl.innerText = "ATTENTION // RF_JAMMING_ACTIVITY_DETECTED";
+                labelEl.className = "alert-text";
+                scopeChart.data.datasets[0].borderColor = '#ff3333';
+            } else {
+                // Plot normal clean mathematical sine pattern cycles
+                nextPoint = 50 + (Math.sin(cycleCounter) * 15);
+                labelEl.innerText = "SCANNER_NOMINAL (ENVIRONMENT_STABLE)";
+                labelEl.className = "";
+                scopeChart.data.datasets[0].borderColor = '#00ff66';
+            }
+
+            nextPoint = Math.max(5, Math.min(95, nextPoint));
+            waveData.push(nextPoint);
+
+            scopeChart.update('none'); // Instant rendering without fading delays
+            requestAnimationFrame(drawWaveFrame);
+        }
+
+        drawWaveFrame();
+    </script>
+</body>
+</html>
